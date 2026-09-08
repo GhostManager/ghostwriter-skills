@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Generated review/conversion artifacts
+output/
+
+# Agent and editor state
+.claude/
+.codex/
+.agents/
+.idea/
+.vscode/

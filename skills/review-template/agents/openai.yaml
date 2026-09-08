@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Template"
+  short_description: "Lint and review Ghostwriter report templates"
+  default_prompt: "Use $review-template to lint this Ghostwriter template and report compatibility, layout, and style-guide issues."
