@@ -17,6 +17,9 @@ DOCUMENT_STRUCTURE = ROOT / "skills" / "create-template" / "references" / "docum
 STRUCTURED_SECTIONS = ROOT / "skills" / "create-template" / "references" / "structured-sections.md"
 TEMPLATE_CONTEXT = ROOT / "skills" / "create-template" / "references" / "template-context.md"
 HELPER = ROOT / "skills" / "create-template" / "scripts" / "replace_docx_text_spans.py"
+SOURCE_FIXTURE_GENERATOR = (
+    ROOT / "skills" / "create-template" / "examples" / "generate_source_docx.py"
+)
 EXTERNAL_AUDITOR = (
     ROOT / "skills" / "create-template" / "scripts" / "audit_docx_external_references.py"
 )
@@ -151,6 +154,88 @@ class CreateTemplateSkillTests(unittest.TestCase):
         ):
             self.assertIn(expected_output, self.style_rules)
         self.assertIn("one uninterrupted Word run", self.style_rules)
+
+    def test_first_check_keeps_normal_body_appearance(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            source = temporary / "source.docx"
+            output = temporary / "output.docx"
+
+            generated = subprocess.run(
+                [sys.executable, str(SOURCE_FIXTURE_GENERATOR), str(source)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+
+            replaced = subprocess.run(
+                [
+                    sys.executable,
+                    str(HELPER),
+                    str(source),
+                    str(output),
+                    "--old",
+                    "Assessment results are summarized here.",
+                    "--new",
+                    "{{p extra_fields.executive_summary}}",
+                    "--clear-replacement-run-formatting",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(replaced.returncode, 0, replaced.stderr)
+
+            with zipfile.ZipFile(output) as archive:
+                document_xml = archive.read("word/document.xml")
+            root = ElementTree.fromstring(document_xml)
+            paragraphs = root.findall(".//{*}p")
+            self.assertIn("{{p extra_fields.executive_summary}}", "".join(root.itertext()))
+
+            body_run = paragraphs[1].find("./{*}r")
+            body_properties = body_run.find("./{*}rPr")
+            self.assertIsNone(body_properties)
+
+    def test_rich_text_clear_option_removes_run_formatting_but_keeps_paragraph_properties(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            source = temporary / "source.docx"
+            output = temporary / "output.docx"
+            document_xml = (
+                b'<w:document xmlns:w="urn:test"><w:body><w:p>'
+                b'<w:pPr><w:jc w:val="center"/></w:pPr>'
+                b'<w:r><w:rPr><w:i/><w:color w:val="1F4E79"/><w:highlight w:val="yellow"/></w:rPr>'
+                b'<w:t>Executive summary goes here.</w:t></w:r>'
+                b'</w:p></w:body></w:document>'
+            )
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("word/document.xml", document_xml)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(HELPER),
+                    str(source),
+                    str(output),
+                    "--old",
+                    "Executive summary goes here.",
+                    "--new",
+                    "{{p extra_fields.executive_summary}}",
+                    "--clear-replacement-run-formatting",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with zipfile.ZipFile(output) as archive:
+                root = ElementTree.fromstring(archive.read("word/document.xml"))
+            paragraph = root.find(".//{*}p")
+            self.assertIsNotNone(paragraph.find("./{*}pPr/{*}jc"))
+            self.assertIsNone(paragraph.find("./{*}r/{*}rPr"))
+            self.assertIn("{{p extra_fields.executive_summary}}", "".join(root.itertext()))
 
     def test_helper_replaces_only_word_text_node_content(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

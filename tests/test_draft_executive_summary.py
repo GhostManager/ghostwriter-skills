@@ -45,6 +45,21 @@ class DraftExecutiveSummarySkillTests(unittest.TestCase):
         self.assertIn("/api/generateReport", self.reference)
         self.assertIn("operationName", self.reference)
 
+    def test_requires_client_ready_subjects_and_avoids_report_meta_narration(self):
+        self.assertIn("paste-ready client prose", self.skill)
+        self.assertIn("the assessment team", self.skill)
+        self.assertIn("the team", self.skill)
+        self.assertIn("Do not use report-meta phrasing", self.skill)
+        self.assertNotIn("SpecterOps", self.skill)
+
+        fixture = (ROOT / "skills" / "draft-executive-summary" / "examples" / "first-check.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"name": "SpecterOps"', fixture)
+        self.assertIn("The SpecterOps assessment team found", fixture)
+        self.assertIn("The team recommends", fixture)
+        self.assertIn("the assessment also noted", fixture)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,7 @@ SKILL_DIR = ROOT / "skills" / "review-template"
 SKILL = SKILL_DIR / "SKILL.md"
 LINTER = SKILL_DIR / "scripts" / "lint_template.py"
 EXACT_LINTER = SKILL_DIR / "scripts" / "run_ghostwriter_lint.py"
+FIRST_CHECK_GENERATOR = SKILL_DIR / "examples" / "generate_invalid_template.py"
 PARITY_REFERENCE = SKILL_DIR / "references" / "ghostwriter-linting.md"
 STYLE_REFERENCE = SKILL_DIR / "references" / "style-guide-review.md"
 
@@ -137,6 +138,36 @@ class ReviewTemplateSkillTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(result["ghostwriter_parity"]["status"], "success")
             self.assertEqual(result["overall_status"], "success")
+
+    def test_first_check_fixture_demonstrates_two_deterministic_failures(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            template = Path(temporary) / "synthetic-invalid.docx"
+            generated = subprocess.run(
+                [sys.executable, str(FIRST_CHECK_GENERATOR), str(template)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            self.assertTrue(template.is_file())
+
+            completed, result = run_linter(template, "--fail-on", "error")
+            self.assertEqual(completed.returncode, 1)
+            codes = {
+                issue["code"] for issue in result["ghostwriter_parity"]["issues"]
+            }
+            self.assertTrue(
+                {"GW-JINJA-FILTER-UNKNOWN", "GW-STYLE-TABLE-GRID-MISSING"}
+                <= codes
+            )
+
+            overwrite = subprocess.run(
+                [sys.executable, str(FIRST_CHECK_GENERATOR), str(template)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(overwrite.returncode, 2)
 
     def test_missing_required_style_and_unknown_filter_fail_parity(self):
         with tempfile.TemporaryDirectory() as temporary:

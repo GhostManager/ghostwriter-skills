@@ -1,6 +1,7 @@
 """Structural safety checks for the report-readiness skill."""
 
 from pathlib import Path
+import json
 import subprocess
 import sys
 import unittest
@@ -10,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "report-readiness" / "SKILL.md"
 REFERENCE = ROOT / "skills" / "report-readiness" / "references" / "readiness-checks.md"
 GRADER = ROOT / "skills" / "report-readiness" / "scripts" / "grade_readiness.py"
+FINDING_QUALITY = ROOT / "skills" / "report-readiness" / "scripts" / "check_finding_quality.py"
+FIRST_CHECK_REPORT = ROOT / "skills" / "report-readiness" / "examples" / "first-check-report.json"
+FIRST_CHECK_READINESS = (
+    ROOT / "skills" / "report-readiness" / "examples" / "first-check-readiness.json"
+)
+FIRST_CHECK_LIBRARY = (
+    ROOT / "skills" / "report-readiness" / "examples" / "first-check-finding-library.json"
+)
 
 
 class ReportReadinessSkillTests(unittest.TestCase):
@@ -41,6 +50,13 @@ class ReportReadinessSkillTests(unittest.TestCase):
         self.assertIn("administrator-defined", self.skill)
         self.assertIn("do not assume labels are universal", self.skill)
         self.assertIn("Do not infer terminal status", self.reference)
+
+    def test_library_comparison_is_automatic_when_available(self):
+        self.assertIn("library export, if supplied with an offline review", self.skill)
+        self.assertIn("comparison is automatic", self.skill)
+        self.assertIn("automatically confirm that the target schema", self.skill)
+        self.assertIn("not applicable", self.skill)
+        self.assertIn("Run this pass automatically", self.reference)
 
     def test_declares_template_and_passive_voice_limits(self):
         self.assertIn("not assessed", self.skill)
@@ -91,6 +107,82 @@ class ReportReadinessSkillTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 2)
+
+    def test_first_check_readiness_fixture_has_the_documented_base_result(self):
+        data = json.loads(FIRST_CHECK_READINESS.read_text(encoding="utf-8"))
+        self.assertEqual(len(data["findings"]), 1)
+        self.assertEqual(data["findings"][0]["id"], 201)
+        self.assertFalse(data["findings"][0]["complete"])
+        self.assertFalse(data["include_bloodhound_data"])
+        result = subprocess.run(
+            [sys.executable, str(GRADER), "--blockers", "1", "--warnings", "0"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "C")
+
+    def test_library_comparison_first_check_reports_advisory_signals(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(FINDING_QUALITY),
+                str(FIRST_CHECK_REPORT),
+                "--library-json",
+                str(FIRST_CHECK_LIBRARY),
+                "--format",
+                "json",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        review = json.loads(result.stdout)
+        self.assertEqual(review["status"], "warning")
+        self.assertEqual(review["findings_reviewed"], 6)
+        codes = {issue["code"] for issue in review["issues"]}
+        self.assertTrue(
+            {
+                "FINDING-LIBRARY-UNCUSTOMIZED",
+                "FINDING-TARGET-PLACEHOLDER",
+                "FINDING-LIBRARY-CLOSE-MATCH",
+                "FINDING-LIBRARY-TITLE-DIVERGENCE",
+                "FINDING-FIELD-INTENT-MISMATCH",
+            }
+            <= codes
+        )
+        self.assertTrue(all(issue["severity"] == "warning" for issue in review["issues"]))
+        library_match = next(
+            issue
+            for issue in review["issues"]
+            if issue["code"] == "FINDING-LIBRARY-CLOSE-MATCH"
+        )
+        self.assertEqual(library_match["finding_id"], 203)
+        self.assertIn("finding-library entry 503", library_match["message"])
+        self.assertIn("exceeding the 80.0% review threshold", library_match["message"])
+        self.assertIn(
+            "does not mean two findings in the report are duplicates",
+            library_match["message"],
+        )
+        self.assertIn("verify the origin flag", library_match["message"])
+        divergence = next(
+            issue
+            for issue in review["issues"]
+            if issue["code"] == "FINDING-LIBRARY-TITLE-DIVERGENCE"
+        )
+        self.assertEqual(divergence["finding_id"], 204)
+        self.assertEqual(divergence["priority"], "elevated")
+        description_impact_swap = next(
+            issue
+            for issue in review["issues"]
+            if issue["finding_id"] == 206
+            and issue["code"] == "FINDING-FIELD-INTENT-MISMATCH"
+        )
+        self.assertEqual(
+            set(description_impact_swap["fields"]), {"description", "impact"}
+        )
 
 
 if __name__ == "__main__":
