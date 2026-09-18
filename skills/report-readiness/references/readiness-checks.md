@@ -61,6 +61,58 @@ The exported JSON provides report-level `findings`, `totals`, `extra_fields`, `p
 
 For placeholders, look for clear authoring residue only: explicit `TODO`, `TBD`, `FIXME`, `XX`, bracketed instructions, obvious dummy values such as “Lorem ipsum,” or text that ends mid-word/mid-sentence. Quote a short, redacted excerpt and identify the field; do not flag ordinary technical terminology, code snippets, Jinja references, or prose merely because it is short.
 
+## Automatic finding-library comparison
+
+Run this pass automatically when the user supplies a compatible finding-library snapshot with an offline review or when connected mode has passed capability preflight and the supplied token is available. The regular report-data export contains report findings but not their original library IDs. A report finding copied from the library is independent data, so comparison can identify a likely candidate but cannot prove provenance. If no offline snapshot is supplied, the offline comparison is not applicable; if the connected target or credential does not expose the library query, mark the comparison not assessed and do not broaden access.
+
+In connected mode, first confirm that the target GraphQL schema exposes the read-only `finding` query for the supplied credential. Retrieve the library in bounded pages and retain it only in memory for the current review. Request only `id`, `title`, `description`, `impact`, `mitigation`, `replicationSteps`, `references`, `hostDetectionTechniques`, `networkDetectionTechniques`, type/severity identifiers, and extra fields when they are needed for a supplied policy. Do not write a local library cache, expose library bodies in the review, or broaden credentials when this query is unavailable. Mark the pass not assessed instead.
+
+Use a stable ID order and repeat with increasing offsets until a page is shorter than the requested limit. For the verified schema, the query shape is:
+
+```graphql
+query FindingLibraryPage($limit: Int!, $offset: Int!) {
+  finding(limit: $limit, offset: $offset, order_by: {id: asc}) {
+    id
+    title
+    description
+    impact
+    mitigation
+    replicationSteps
+    references
+    hostDetectionTechniques
+    networkDetectionTechniques
+    findingTypeId
+    severityId
+  }
+}
+```
+
+For a decoded report export and separately saved library snapshot, use [`check_finding_quality.py`](../scripts/check_finding_quality.py) to produce the deterministic advisory signals before performing any narrower manual semantic review:
+
+```bash
+python3 scripts/check_finding_quality.py report-data.json \
+  --library-json finding-library.json --format json
+```
+
+The helper accepts either a `findings` list/report export or a saved `data.finding` GraphQL response for the library input. It exits successfully when it finds warnings and never edits either input.
+
+Normalize HTML to text, decode entities, compare case-insensitively, and collapse whitespace and presentation-only punctuation. Preserve meaningful hostnames, application names, domains, user identifiers, and other target terms: removing them would hide the customization the check needs to assess. Compare fields independently and as a weighted composite; exclude a library field from the composite only when it is empty in the library. A default composite threshold of 80% is a review heuristic, not proof that two findings are the same.
+
+Use staged candidate selection rather than treating the nearest string match as conclusive:
+
+- Consider close title candidates first (default similarity at least 90%), and maintain a content index so that a substantially re-titled library copy can still be found.
+- For an `added_as_blank: true` report finding, warn on a composite similarity of at least 80% to a library candidate. Describe this as a report-to-library close match requiring peer review, not as duplicate findings within the report. Report both IDs/titles, the threshold and similarity evidence, and the recommended review action without copying the library body text.
+- When the title is at least 90% similar but the comparable body is materially different (default below 50%), raise an elevated peer-review warning. It may be an intentional rewrite, but it deserves review because the title indicates the same concept while the draft lacks the library's peer-reviewed wording. Do not change the finding's security severity or call it a duplicate automatically.
+- For an `added_as_blank: false` report finding, warn only when the client-facing content is effectively unchanged (default at least 98% composite) and there is no target-specific addition, such as a populated non-placeholder Affected Entities field. This is a customization prompt, not a requirement that every library-derived finding be rewritten.
+
+Assess every available finding field for its intended role. A concise Title should name the condition; Affected Entities should identify targets; Description should explain the condition; Impact should describe consequence; Mitigation should request remediation; Reproduction Steps should explain how to verify the condition; Host/Network Detection Techniques should describe relevant telemetry or detection activity; References should identify external sources; and Finding Guidance should contain internal editorial guidance. Evaluate custom fields only when a supplied schema or policy defines their intended semantics. Empty optional fields are not evidence of a mismatch.
+
+Check likely field-intent errors as warnings. Compare every populated client-facing report field against every populated field on the best library candidate, not merely its counterpart: flag a reciprocal high-confidence swap when each report field closely matches the other's library value substantially more than its own. Also flag a single report field that is nearly identical to a different candidate field while materially unlike its expected field. Include the two field names and similarity evidence, but not copied library content. Evaluate Finding Guidance separately as internal context: it can warrant an authoring warning when it appears to hold client-facing content, but it is not itself a delivery defect.
+
+Without a useful candidate, flag only strong structural signals, such as a title containing a full procedure or URL, Affected Entities containing instructions or citations, or References consisting of numbered instructions while Reproduction Steps contains only citations or URLs. For semantic concerns that lack deterministic evidence, assess the text against the field roles above and describe the result as a low-confidence manual review prompt rather than asserting a field is wrong.
+
+Target-substitution cues such as `entity tested`, `affected entity`, `[client]`, `<hostname>`, or an explicit “replace with target” instruction are warning-level signals in client-facing fields. They are distinct from unmistakable authoring residue (`TODO`, `TBD`, and similar), which follows the completeness rule. Do not scan internal Finding Guidance with this heuristic; it commonly contains editorial instructions by design.
+
 ## Objectives
 
 Project objectives include a boolean `complete` and an administrator-configurable status label. The report export contains the label but not a universal definition of which labels are terminal. A user-supplied terminal-status set applies in addition to `complete: true`. Do not infer terminal status from a label such as “Closed,” “Missed,” or “Complete.”

@@ -1,0 +1,16 @@
+{
+  "title": "Sample Internal Assessment",
+  "findings": [
+    {
+      "id": 201,
+      "title": "Administrative endpoint lacks role check",
+      "severity": "High",
+      "complete": false,
+      "description": "A standard account can access an administrative endpoint.",
+      "impact": "Unauthorized administrative actions may be possible.",
+      "recommendation": "Enforce server-side role authorization."
+    }
+  ],
+  "objectives": [],
+  "include_bloodhound_data": false
+}

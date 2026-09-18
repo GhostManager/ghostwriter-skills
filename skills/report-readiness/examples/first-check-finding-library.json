@@ -1,0 +1,58 @@
+{
+  "findings": [
+    {
+      "id": 501,
+      "title": "Administrative endpoint lacks role check",
+      "description": "A standard account can access an administrative endpoint.",
+      "impact": "Unauthorized administrative actions may be possible.",
+      "mitigation": "Enforce server-side role authorization.",
+      "replication_steps": "1. Sign in as a standard account.\n2. Request the administrative endpoint.",
+      "references": "https://owasp.org/www-project-top-ten/"
+    },
+    {
+      "id": 502,
+      "title": "Verbose response header",
+      "description": "The application response discloses an implementation version in a response header.",
+      "impact": "The detail can help an attacker tailor reconnaissance and exploit research.",
+      "mitigation": "Remove unnecessary version headers from public responses.",
+      "replication_steps": "1. Request the application home page.\n2. Inspect returned response headers.",
+      "references": "https://owasp.org/www-project-web-security-testing-guide/"
+    },
+    {
+      "id": 503,
+      "title": "Missing authorization on account export",
+      "description": "Changing an account identifier in an export request returns another account's data.",
+      "impact": "An unauthorized user could obtain data belonging to other accounts.",
+      "mitigation": "Enforce object-level authorization on every export request.",
+      "replication_steps": "1. Sign in as a standard user.\n2. Request an export for another account identifier.",
+      "references": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+    },
+    {
+      "id": 504,
+      "title": "Password reset token is predictable",
+      "description": "Password reset tokens can be guessed when the application generates them from predictable account and time data.",
+      "impact": "An attacker may reset another user's password and take over the account.",
+      "mitigation": "Generate reset tokens with a cryptographically secure random source and expire them promptly.",
+      "replication_steps": "1. Request resets for two test accounts.\n2. Compare token values and attempt to predict a third token.",
+      "references": "https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html"
+    },
+    {
+      "id": 505,
+      "title": "HTTP response metadata exposure",
+      "description": "The service reveals unnecessary metadata in an HTTP response.",
+      "impact": "The metadata can aid attacker reconnaissance.",
+      "mitigation": "Remove unnecessary metadata from public responses.",
+      "replication_steps": "1. Request the endpoint.\n2. Inspect the response headers.",
+      "references": "https://www.rfc-editor.org/rfc/rfc9110"
+    },
+    {
+      "id": 506,
+      "title": "Session management permits fixation",
+      "description": "The application accepts a caller-controlled session identifier and does not rotate it after authentication.",
+      "impact": "An attacker who fixes a known session identifier before login may access the authenticated session.",
+      "mitigation": "Issue a new session identifier after authentication and reject caller-provided session identifiers.",
+      "replication_steps": "1. Set a known session identifier.\n2. Authenticate and observe that the identifier remains valid.",
+      "references": "https://owasp.org/www-community/attacks/Session_fixation"
+    }
+  ]
+}

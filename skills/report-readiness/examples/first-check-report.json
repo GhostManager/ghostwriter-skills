@@ -1,0 +1,83 @@
+{
+  "title": "Sample Internal Assessment",
+  "findings": [
+    {
+      "id": 201,
+      "title": "Administrative endpoint lacks role check",
+      "severity": "High",
+      "complete": false,
+      "added_as_blank": false,
+      "affected_entities": "",
+      "description": "A standard account can access an administrative endpoint.",
+      "impact": "Unauthorized administrative actions may be possible.",
+      "mitigation": "Enforce server-side role authorization.",
+      "replication_steps": "1. Sign in as a standard account.\n2. Request the administrative endpoint.",
+      "references": "https://owasp.org/www-project-top-ten/"
+    },
+    {
+      "id": 202,
+      "title": "Verbose response header",
+      "severity": "Informational",
+      "complete": true,
+      "added_as_blank": false,
+      "affected_entities": "entity tested",
+      "description": "The application response discloses an implementation version in a response header.",
+      "impact": "The detail can help an attacker tailor reconnaissance and exploit research.",
+      "mitigation": "Remove unnecessary version headers from public responses.",
+      "replication_steps": "1. Request the application home page.\n2. Inspect returned response headers.",
+      "references": "https://owasp.org/www-project-web-security-testing-guide/"
+    },
+    {
+      "id": 203,
+      "title": "Missing authorization on account export",
+      "severity": "High",
+      "complete": true,
+      "added_as_blank": true,
+      "affected_entities": "account export endpoint",
+      "description": "Changing an account identifier in an export request returns another account's data.",
+      "impact": "An unauthorized user could obtain data belonging to other accounts.",
+      "mitigation": "Enforce object-level authorization on every export request.",
+      "replication_steps": "1. Sign in as a standard user.\n2. Request an export for another account identifier.",
+      "references": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+    },
+    {
+      "id": 204,
+      "title": "Password reset token is predictable",
+      "severity": "Medium",
+      "complete": true,
+      "added_as_blank": true,
+      "affected_entities": "reset workflow",
+      "description": "The reset experience sends a short notification after a user requests assistance.",
+      "impact": "The service desk may receive duplicate requests during busy periods.",
+      "mitigation": "Review the workflow with the product team before the next release.",
+      "replication_steps": "1. Request a password reset.\n2. Observe the confirmation message.",
+      "references": "https://example.invalid/reset-review"
+    },
+    {
+      "id": 205,
+      "title": "HTTP response metadata exposure",
+      "severity": "Informational",
+      "complete": true,
+      "added_as_blank": false,
+      "affected_entities": "public web service",
+      "description": "The service reveals unnecessary metadata in an HTTP response.",
+      "impact": "The metadata can aid attacker reconnaissance.",
+      "mitigation": "Remove unnecessary metadata from public responses.",
+      "replication_steps": "https://www.rfc-editor.org/rfc/rfc9110",
+      "references": "1. Request the endpoint.\n2. Inspect the response headers."
+    },
+    {
+      "id": 206,
+      "title": "Session management permits fixation",
+      "severity": "Medium",
+      "complete": true,
+      "added_as_blank": false,
+      "affected_entities": "login service",
+      "description": "An attacker who fixes a known session identifier before login may access the authenticated session.",
+      "impact": "The application accepts a caller-controlled session identifier and does not rotate it after authentication.",
+      "mitigation": "Issue a new session identifier after authentication and reject caller-provided session identifiers.",
+      "replication_steps": "1. Set a known session identifier.\n2. Authenticate and observe that the identifier remains valid.",
+      "references": "https://owasp.org/www-community/attacks/Session_fixation"
+    }
+  ]
+}
