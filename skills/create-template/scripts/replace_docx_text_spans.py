@@ -5,10 +5,12 @@ This helper deliberately operates only on <w:t> text-node contents in DOCX XML
 parts. It replaces tokens contained in one text node or split across adjacent
 text nodes in one paragraph. For a split token, the replacement is placed in
 the first matched text node so it inherits that run's formatting; consumed text
-in later nodes is cleared. The rest of the ZIP package, including relationships,
-formatting, fields, images, and Word run boundaries, is preserved. It is
-intentionally not a semantic document converter: determine mappings before
-invoking it.
+in later nodes is cleared. Use --clear-replacement-run-formatting for a
+paragraph-level rich-text expression such as {{p extra_fields.summary}} when
+the incoming value, rather than the placeholder, should control character
+formatting. The rest of the ZIP package, including relationships, fields,
+images, and Word run boundaries, is preserved. It is intentionally not a
+semantic document converter: determine mappings before invoking it.
 """
 
 from __future__ import annotations
@@ -26,7 +28,10 @@ from xml.sax.saxutils import escape
 
 TEXT_NODE = re.compile(rb"(<w:t(?:\s+[^>]*)?>)(.*?)(</w:t>)", re.DOTALL)
 PARAGRAPH = re.compile(rb"(<w:p(?:\s+[^>]*)?>)(.*?)(</w:p>)", re.DOTALL)
+RUN = re.compile(rb"(<w:r(?:\s+[^>]*)?>)(.*?)(</w:r>)", re.DOTALL)
+RUN_PROPERTIES = re.compile(rb"<w:rPr(?:\s+[^>]*)?(?:/>|>.*?</w:rPr>)", re.DOTALL)
 WORD_XML_PREFIX = "word/"
+CLEAR_FORMATTING_MARKER = b"__GW_CLEAR_REPLACEMENT_RUN_FORMATTING__"
 
 
 def replace_in_text_nodes(xml: bytes, old: bytes, new: bytes) -> tuple[bytes, int]:
@@ -114,12 +119,34 @@ def replace_cross_node_paragraph_tokens(xml: bytes, old: bytes, new: bytes) -> t
     return PARAGRAPH.sub(replace_paragraph, xml), replacements
 
 
+def clear_marked_run_properties(xml: bytes) -> bytes:
+    """Clear direct character formatting from runs marked during replacement."""
+
+    def clear_run(match: re.Match[bytes]) -> bytes:
+        content = match.group(2)
+        if CLEAR_FORMATTING_MARKER not in content:
+            return match.group(0)
+        content = RUN_PROPERTIES.sub(b"", content)
+        content = content.replace(CLEAR_FORMATTING_MARKER, b"")
+        return match.group(1) + content + match.group(3)
+
+    return RUN.sub(clear_run, xml)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, help="Source DOCX file to leave unchanged.")
     parser.add_argument("output", type=Path, help="New DOCX file to create.")
     parser.add_argument("--old", required=True, help="Exact text token to replace.")
     parser.add_argument("--new", required=True, help="Replacement text token.")
+    parser.add_argument(
+        "--clear-replacement-run-formatting",
+        action="store_true",
+        help=(
+            "Clear direct character formatting from the run receiving the replacement. "
+            "Use for paragraph-level rich-text expressions whose incoming value controls formatting."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -146,6 +173,9 @@ def main() -> int:
 
     replacement_count = 0
     modified_parts: list[str] = []
+    replacement_text = new
+    if args.clear_replacement_run_formatting:
+        replacement_text = CLEAR_FORMATTING_MARKER + new + CLEAR_FORMATTING_MARKER
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -160,10 +190,14 @@ def main() -> int:
                 for info in source_zip.infolist():
                     content = source_zip.read(info.filename)
                     if info.filename.startswith(WORD_XML_PREFIX) and info.filename.endswith(".xml"):
-                        content, count = replace_in_text_nodes(content, old, new)
-                        content, cross_node_count = replace_cross_node_paragraph_tokens(content, old, new)
+                        content, count = replace_in_text_nodes(content, old, replacement_text)
+                        content, cross_node_count = replace_cross_node_paragraph_tokens(
+                            content, old, replacement_text
+                        )
                         count += cross_node_count
                         if count:
+                            if args.clear_replacement_run_formatting:
+                                content = clear_marked_run_properties(content)
                             ElementTree.fromstring(content)
                             replacement_count += count
                             modified_parts.append(info.filename)

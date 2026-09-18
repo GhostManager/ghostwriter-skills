@@ -87,6 +87,14 @@ python3 scripts/run_ghostwriter_lint.py TEMPLATE \
 
 The wrapper uses an in-memory template adapter, does not create or upload a `ReportTemplate`, and rejects database write SQL while the linter runs. It does read the target database's extra-field and report configuration. Show the user this exact-target result separately from the broader review. Never write a database record solely for linting.
 
+## Example first check
+
+**Input:** a local DOCX template that references an unknown filter, `{{ findings | made_up_filter }}`, and lacks the required `Table Grid` table style.
+
+**Expected outcome:** the offline checker returns a non-success result that includes `GW-JINJA-FILTER-UNKNOWN` and `GW-STYLE-TABLE-GRID-MISSING` in its Ghostwriter-parity findings. It must not upload, activate, or otherwise modify the template.
+
+This demonstrates two deterministic failure modes, not complete Ghostwriter rendering or every version-specific filter. The sanitized [first-check fixture](examples/first-check.md) gives the command and minimal expected result shape.
+
 ## Review template semantics
 
 After the deterministic pass, inspect the template expressions and structure rather than stopping at syntax:

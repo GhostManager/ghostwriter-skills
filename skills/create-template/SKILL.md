@@ -36,6 +36,14 @@ Optional:
 
 Keep credentials out of files, generated templates, command output, and the final conversion report. Do not broaden access after an authorization failure.
 
+## Example first check
+
+**Input:** a one-page offline source DOCX whose heading is `Executive Summary` and whose body is `Assessment results are summarized here.` in the unmodified `Normal` style (black, non-italic, with no direct run color or italic formatting).
+
+**Expected outcome:** retain the heading and its page/paragraph formatting, replace the body with `{{p extra_fields.executive_summary}}` while keeping the Normal appearance black and non-italic, and return a conversion report that identifies `executive_summary` as a proposed report-level rich-text field. The result must not upload or activate the template.
+
+This is a bounded mapping check, not proof that a conversion will preserve every Word feature or that the proposed field exists on a target instance. Use the sanitized [first-check fixture](examples/first-check.md) for the exact input, expected evidence, and negative checks.
+
 ## Analyze before editing
 
 1. Inspect the entire DOCX package: document body, tables, text boxes, headers, footers, footnotes/endnotes, section breaks, explicit and style-driven page breaks, images, styles, native Word fields, the table of contents, package relationships, and existing Jinja. Render the source and inspect every page or a representative contact sheet plus all pages that contain replaced content. Build a page-boundary ledger that records each source break and the semantic content immediately before and after it.
@@ -53,6 +61,8 @@ Read [the document-structure reference](references/document-structure.md) before
 - Preserve or reconstruct the source's native Word TOC field and its location. Do not replace it with a typed list of headings. Keep heading outline levels compatible with the TOC and always preserve or create a new-page boundary after the complete TOC block. Do not force `w:updateFields` on open merely to refresh the TOC; that setting can make Word display a misleading external-file warning even when the package has no external reference. Preserve the source setting unless the user explicitly accepts automatic-update prompts, and otherwise record that the user should refresh fields manually in Word.
 - Preserve paragraph properties and the intended source run's character formatting when replacing inline text. Cover-page client names, report titles, dates, classification labels, and running headers must retain their original font, size, weight, color, capitalization, and alignment unless the user requests a redesign.
 - Do not use `paragraph.clear()` followed by an unformatted `add_run()` for a formatted replacement. Prefer the included [replacement helper](scripts/replace_docx_text_spans.py), or copy the source run properties to the replacement run when a semantic restructuring requires a document library.
+- When the source body uses the unmodified `Normal` style, do not introduce direct run color, italic, or other decorative formatting while inserting a Jinja expression; preserve the source appearance rather than styling the placeholder.
+- Distinguish placeholder types: preserve the source run's character formatting for ordinary inline values such as `{{ entity_tested }}`; for paragraph-level rich-text values such as `{{p extra_fields.executive_summary}}`, use the helper's `--clear-replacement-run-formatting` option so incoming Ghostwriter formatting controls the content. This clears only direct character properties on the replacement run and preserves paragraph properties and layout.
 
 ## Apply style guides and specific requests
 

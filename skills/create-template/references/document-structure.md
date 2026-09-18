@@ -41,7 +41,7 @@ For each inline replacement, identify the source paragraph and the run that visu
 
 The replacement expression should live in the text node of the intended formatted run. When a token spans several runs, put the replacement in the first semantically styled run and clear only the consumed text from subsequent runs. Do not reconstruct the whole paragraph with default formatting.
 
-Use `scripts/replace_docx_text_spans.py` for confirmed literal replacements. It preserves the first matched run's formatting even when the source token is split across adjacent Word text nodes within one paragraph. Use a document library only when structural changes are required, and copy the relevant `w:rPr` before replacing the run text.
+Use `scripts/replace_docx_text_spans.py` for confirmed literal replacements. By default it preserves the first matched run's formatting even when the source token is split across adjacent Word text nodes within one paragraph. For a paragraph-level rich-text expression such as `{{p extra_fields.executive_summary}}`, pass `--clear-replacement-run-formatting` so direct character properties on the placeholder run do not impose formatting on incoming Ghostwriter content; paragraph properties remain intact. Use a document library only when structural changes are required, and copy the relevant `w:rPr` before replacing the run text.
 
 ## Verification
 
