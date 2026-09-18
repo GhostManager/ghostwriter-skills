@@ -16,12 +16,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * `review-template` checks DOCX and PPTX templates for Ghostwriter compatibility and broader authoring risks
 * Added offline analysis paths for template review, template conversion, report readiness, and report-summary drafting from complete local exports
 * Added connected GraphQL workflows using the public `/v1/graphql` endpoint and scoped project-read service tokens
-
-### Fixed
-
-* Corrected connected extra-field discovery to query Ghostwriter's scalar `extraFieldSpec` response and decode its JSON locally
-* Clarified that `generateReport` is a read-only export Action and that offline report analysis operates on a previously retrieved snapshot
-
-### Security
-
-* Documented bearer-token handling, project-read service-token preference, read-only boundaries, and protection against leaking credentials or calling internal Action handlers directly
